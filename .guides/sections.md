@@ -223,6 +223,8 @@ We can write the type `“list of a”` by enclosing the type variable in square
 >#Distinguishing type names and type variables
 We can now see why a type name must start with an uppercase letter: this makes it distinct from a type variable, which must start with a lowercase letter.
 
+
+
 When we talk about a list with values of a specific type, we substitute that type for our type variable. So, for example, the type `[Int]` is a list of values of type `Int`, because we substituted `Int` for `a`. Similarly, the type `[MyPersonalType]` is a list of values of type `MyPersonalType`. We can perform this substitution recursively, too: `[[Int]]` is a list of values of type `[Int]`, i.e. a list of lists of `Int`.
 
 ```haskell
@@ -376,19 +378,315 @@ readFile :: FilePath -> IO String
 
 Haskell's type system prevents us from accidentally mixing pure and impure code.
 ---
-title: New Section 15
+title: "Haskell source files, and writing simple functions"
+files:
+  - action: open
+    path: add.hs
+    panel: 0
+  - action: open
+    path: "#terminal: ghci"
+    panel: 0
+layout: ""
+
+---
+Now that we know how to apply functions, it's time we turned our attention to writing them. While we can write functions in ghci, it's not a good environment for this. It only accepts a highly restricted subset of Haskell: most importantly, the syntax it uses for defining functions is not the same as we use in a Haskell source file[5]. Instead, we'll finally break down and create a source file.
+
+Haskell source files are usually identified with a suffix of `.hs`.
+
+>#Get the source code
+If you look in the file tree, you should now see a file `add.hs` with code already there. Feel free to open it up, although it should already have opened up for you, along with a terminal window.
+
+On the left hand side of the `=` is the name of the function, followed by the arguments to the function. On the right hand side is the body of the function. With our source file saved, we can load it into ghci, and use our new add function straight away. (The prompt that ghci displays will change after you load your file.) 
+
+```haskell
+ghci> :load add.hs
+[1 of 1] Compiling Main             ( add.hs, interpreted )
+Ok, modules loaded: Main.
+ghci> add 1 2
+3
+```
+
+>#What if ghci cannot find your source file?
+When you run ghci it may not be able to find your source file. It will search for source files in whatever directory it was run. If this is not the directory that your source file is actually in, you can use ghci's `:cd` command to change its working directory.
+
+```haskell
+ghci> :cd /tmp
+```
+
+Alternatively, you can provide the path to your Haskell source file as the argument to :load. This path can be either absolute or relative to ghci's current directory.
+
+When we apply `add` to the values `1` and `2`, the variables `a` and `b` on the left hand side of our definition are given (or “bound to”) the values `1` and `2`, so the result is the expression `1 + 2`.
+
+Haskell doesn't have a `return` keyword, as a function is a single expression, not a sequence of statements. The value of the expression is the result of the function. (Haskell does have a function called `return`, but we won't discuss it for a while; it has a different meaning than in imperative languages.)
+
+When you see an `=` symbol in Haskell code, it represents “meaning”: the name on the left is defined to be the expression on the right.
+
+---
+title: "Just what is a variable, anyway?"
+files:
+  - action: close
+    path: "#tabs"
+  - action: open
+    path: Assign.hs
+    panel: 0
+  - action: open
+    path: "#terminal: ghci"
+    panel: 0
+layout: ""
+
+---
+In Haskell, a variable provides a way to give a name to an expression. Once a variable is *bound* to (i.e. associated with) a particular expression, its value does not change: we can always use the name of the variable instead of writing out the expression, and get the same result either way.
+
+If you're used to imperative programming languages, you're likely to think of a variable as a way of identifying a memory location (or some equivalent) that can hold different values at different times. In an imperative language we can change a variable's value at any time, so that examining the memory location repeatedly can potentially give different results each time.
+
+The critical difference between these two notions of a variable is that in Haskell, once we've bound a variable to an expression, we know that we can always substitute it for that expression, because it will not change. In an imperative language, this notion of substitutability does not hold.
+
+For example, if we run the following tiny Python script, it will print the number 11.
+
+```python
+x = 10
+x = 11
+# value of x is now 11
+print x
+```
+
+In contrast, trying the equivalent in Haskell results in an error. 3 comments
+
+```haskell
+-- file: ch02/Assign.hs
+x = 10
+x = 11
+```
+
+We cannot assign a value to x twice.
+
+```haskell
+ghci> :load Assign
+[1 of 1] Compiling Main             ( Assign.hs, interpreted )
+
+Assign.hs:4:0:
+    Multiple declarations of `Main.x'
+    Declared at: Assign.hs:3:0
+                 Assign.hs:4:0
+Failed, modules loaded: none.
+```
+
+---
+title: Conditional evaluation
+files:
+  - action: close
+    path: "#tabs"
+  - action: open
+    path: myDrop.hs
+    panel: 0
+    index: 0
+    type: file
+    arg: myDrop.hs
+  - action: open
+    path: "#terminal: ghci"
+    panel: 0
+    index: 1
+    type: terminal
+    arg: ghci
+layout: ""
+
+---
+Like many other languages, Haskell has an `if` expression. Let's see it in action, then we'll explain what's going on. As an example, we'll write our own version of the standard `drop` function. Before we begin, let's probe a little into how `drop` behaves, so we can replicate its behaviour.
+
+```haskell
+ghci> drop 2 "foobar"
+"obar"
+ghci> drop 4 "foobar"
+"ar"
+ghci> drop 4 [1,2]
+[]
+ghci> drop 0 [1,2]
+[1,2]
+ghci> drop 7 []
+[]
+ghci> drop (-2) "foo"
+"foo"
+```
+From the above, it seems that drop returns the original list if the number to remove is less than or equal to zero. Otherwise, it removes elements until either it runs out or reaches the given number. Here's a myDrop function that has the same behaviour, and uses Haskell's if expression to decide what to do. The null function below checks whether a list is empty.
+
+>Source Code
+>You should now have a terminal window and `myDrop.hs` opened up in the left panel. Take a look at the `myDrop.hs` function.
+
+In Haskell, **indentation is important**: it continues an existing definition, instead of starting a new one. Don't omit the indentation!
+
+You might wonder where the variable name `xs` comes from in the Haskell function. This is a common naming pattern for lists: you can read the `s` as a suffix, so the name is essentially “plural of x”.
+
+```haskell
+ghci> :load myDrop.hs
+[1 of 1] Compiling Main             ( myDrop.hs, interpreted )
+Ok, modules loaded: Main.
+ghci> myDrop 2 "foobar"
+"obar"
+ghci> myDrop 4 "foobar"
+"ar"
+ghci> myDrop 4 [1,2]
+[]
+ghci> myDrop 0 [1,2]
+[1,2]
+ghci> myDrop 7 []
+[]
+ghci> myDrop (-2) "foo"
+"foo"
+```
+
+Now that we've seen `myDrop` in action, let's return to the source code and look at all the novelties we've introduced.
+
+First of all, we have introduced `--`, the beginning of a single-line comment. This comment extends to the end of the line.
+
+Next is the `if` keyword itself. It introduces an expression that has three components.
+
+- An expression of type `Bool`, immediately following the `if`. We refer to this as a *predicate*.
+- A `then` keyword, followed by another expression. This expression will be used as the value of the `if` expression if the predicate evaluates to `True`.
+- An `else` keyword, followed by another expression. This expression will be used as the value of the `if` expression if the predicate evaluates to `False`.
+
+We'll refer to the expressions after the `then` and `else` keywords as “branches”. The branches must have the same types; the `if` expression will also have this type. An expression such as `if True then 1 else "foo"` has different types for its branches, so it is ill typed and will be rejected by a compiler or interpreter.
+
+Recall that Haskell is an expression-oriented language. In an imperative language, it can make sense to omit the else branch from an if, because we're working with *statements*, not expressions. However, when we're working with expressions, an `if` that was missing an else wouldn't have a result or type if the predicate evaluated to `False`, so it would be nonsensical.
+
+Our predicate contains a few more novelties. The null function indicates whether a list is empty, while the `(||)` operator performs a logical “or” of its Bool-typed arguments.
+
+```haskell
+ghci> :type null
+null :: [a] -> Bool
+ghci> :type (||)
+(||) :: Bool -> Bool -> Bool
+```
+>Operators are not special
+>Notice that we were able to find the type of `(||)` by wrapping it in parentheses. The `(||)` operator isn't “built into” the language: it's an ordinary function.
+>
+>The `(||)` operator “short circuits”: if its left operand evaluates to True, it doesn't evaluate its right operand. In most languages, short-circuit evaluation requires special support, but not in Haskell. We'll see why shortly.
+
+Next, our function applies itself recursively. This is our first example of recursion, which we'll talk about in some detail shortly. 3 comments
+
+Finally, our if expression spans several lines. We align the then and else branches under the if for neatness. So long as we use some indentation, the exact amount is not important. If we wish, we can write the entire expression on a single line.
+
+```haskell
+-- file: ch02/myDrop.hs
+myDropX n xs = if n <= 0 || null xs then xs else myDropX (n - 1) (tail xs)
+```
+
+The length of this version makes it more difficult to read. We will usually break an if expression across several lines to keep the predicate and each of the branches easier to follow.
+
+For comparison, here is a Python equivalent of the Haskell `myDrop`. The two are structured similarly: each decrements a counter while removing an element from the head of the list.
+
+```python
+def myDrop(n, elts):
+    while n > 0 and elts:
+        n = n - 1
+        elts = elts[1:]
+    return elts
+```    
+
+---
+title: Understanding evaluation by example
+files: []
+
+---
+In our description of `myDrop`, we have so far focused on surface features. We need to go deeper, and develop a useful mental model of how function application works. To do this, we'll first work through a few simple examples, until we can walk through the evaluation of the expression `myDrop 2 "abcd"`.
+
+We've talked several times about substituting an expression for a variable, and we'll make use of this capability here. Our procedure will involve rewriting expressions over and over, substituting expressions for variables until we reach a final result. This would be a good time to fetch a pencil and paper, so that you can follow our descriptions by trying them yourself.
+
+##Lazy evaluation
+We will begin by looking at the definition of a simple, nonrecursive function.
+
+>Source Code
+>You should now have a file `RoundToEven` open up along with a Terminal window.
+
+Here, `mod` is the standard modulo function. The first big step to understanding how evaluation works in Haskell is figuring out what the result of evaluating the expression `isOdd (1 + 2)` is.
+
+Before we explain how evaluation proceeds in Haskell, let us recap the sort of evaluation strategy used by more familiar languages. First, evaluate the subexpression `1 + 2`, to give `3`. Then apply the `odd` function with `n` bound to `3`. Finally, evaluate `mod 3 2` to give `1`, and `1 == 1` to give `True`.
+
+In a language that uses strict evaluation, the arguments to a function are evaluated before the function is applied. Haskell chooses another path: non-strict evaluation.
+
+In Haskell, the subexpression `1 + 2` is not reduced to the value `3`. Instead, we create a “promise” that when the value of the expression `isOdd (1 + 2)` is needed, we'll be able to compute it. The record that we use to track an unevaluated expression is referred to as a *thunk*. This is all that happens: we create a thunk, and defer the actual evaluation until it's really needed. If the result of this expression is never subsequently used, we will not compute its value at all.
+
+Non-strict evaluation is often referred to as lazy evaluation.
+
+##A more involved example
+Let us now look at the evaluation of the expression `myDrop 2 "abcd"`, where we use `print` to ensure that it will be evaluated.
+
+```haskell
+ghci> print (myDrop 2 "abcd")
+"cd"
+```
+
+Our first step is to attempt to apply `print`, which needs its argument to be evaluated. To do that, we apply the function `myDrop` to the values `2` and `"abcd"`. We bind the variable `n` to the value `2`, and `xs` to `"abcd"`. If we substitute these values into `myDrop`'s predicate, we get the following expression.
+
+```haskell
+ghci> :type  2 <= 0 || null "abcd"
+2 <= 0 || null "abcd" :: Bool
+```
+
+We then evaluate enough of the predicate to find out what its value is. This requires that we evaluate the `(||)` expression. To determine its value, the `(||)` operator needs to examine the value of its left operand first.
+
+```haskell
+ghci> 2 <= 0
+False
+```
+
+Substituting that value into the `(||)` expression leads to the following expression.
+
+```haskell
+ghci> :type  False || null "abcd"
+False || null "abcd" :: Bool
+```
+
+If the left operand had evaluated to `True`, `(||)` would not need to evaluate its right operand, since it could not affect the result of the expression. Since it evaluates to False, `(||)` must evaluate the right operand.
+
+```haskell
+ghci> null "abcd"
+False
+```
+
+We now substitute this value back into the `(||)` expression. Since both operands evaluate to `False`, the `(||)` expression does too, and thus the predicate evaluates to `False`.
+
+```haskell
+ghci> False || False
+False
+```
+
+This causes the if expression's `else` branch to be evaluated. This branch contains a recursive application of `myDrop`.
+
+>Short circuiting for free
+>Many languages need to treat the logical-or operator specially so that it short circuits if its left operand evaluates to True. In Haskell, `(||)` is an ordinary function: non-strict evaluation builds this capability into the language.
+>
+>In Haskell, we can easily define a new function that short circuits.
+>
+>```haskell
+-- file: ch02/shortCircuit.hs
+newOr a b = if a then a else b
+>```
+>
+>If we write an expression like `newOr True (length [1..] > 0)`, it will not evaluate its second argument. (This is just as well: that expression tries to compute the length of an infinite list. If it were evaluated, it would hang ghci, looping infinitely until we killed it.) 7 comments
+>
+>Were we to write a comparable function in, say, Python, strict evaluation would bite us: both arguments would be evaluated before being passed to `newOr`, and we would not be able to avoid the infinite loop on the second argument.
+
+
+---
+title: aaaa
+files: []
+
+---
+xxx
+---
+title: New Section 20
 files: []
 
 ---
 
 ---
-title: New Section 16
+title: New Section 21
 files: []
 
 ---
 
 ---
-title: New Section 17
+title: New Section 22
 files: []
 
 ---
