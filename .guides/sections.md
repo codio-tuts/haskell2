@@ -584,7 +584,14 @@ def myDrop(n, elts):
 
 ---
 title: Understanding evaluation by example
-files: []
+files:
+  - action: open
+    path: "myDrop.hs, RoundToEven.hs"
+    panel: 0
+  - action: open
+    path: "#terminal: ghci"
+    panel: 0
+layout: ""
 
 ---
 In our description of `myDrop`, we have so far focused on surface features. We need to go deeper, and develop a useful mental model of how function application works. To do this, we'll first work through a few simple examples, until we can walk through the evaluation of the expression `myDrop 2 "abcd"`.
@@ -595,9 +602,9 @@ We've talked several times about substituting an expression for a variable, and 
 We will begin by looking at the definition of a simple, nonrecursive function.
 
 >Source Code
->You should now have a file `RoundToEven` open up along with a Terminal window.
+>You should now have a file `RoundToEven.hs` open up along with a Terminal window. 
 
-Here, `mod` is the standard modulo function. The first big step to understanding how evaluation works in Haskell is figuring out what the result of evaluating the expression `isOdd (1 + 2)` is.
+In `RoundToEven.hs`, `mod` is the standard modulo function. The first big step to understanding how evaluation works in Haskell is figuring out what the result of evaluating the expression `isOdd (1 + 2)` is.
 
 Before we explain how evaluation proceeds in Haskell, let us recap the sort of evaluation strategy used by more familiar languages. First, evaluate the subexpression `1 + 2`, to give `3`. Then apply the `odd` function with `n` bound to `3`. Finally, evaluate `mod 3 2` to give `1`, and `1 == 1` to give `True`.
 
@@ -652,7 +659,7 @@ False
 
 This causes the if expression's `else` branch to be evaluated. This branch contains a recursive application of `myDrop`.
 
->Short circuiting for free
+>#Short circuiting for free
 >Many languages need to treat the logical-or operator specially so that it short circuits if its left operand evaluates to True. In Haskell, `(||)` is an ordinary function: non-strict evaluation builds this capability into the language.
 >
 >In Haskell, we can easily define a new function that short circuits.
@@ -668,11 +675,91 @@ newOr a b = if a then a else b
 
 
 ---
-title: aaaa
+title: Recursion
 files: []
 
 ---
-xxx
+When we apply `myDrop` recursively, `n` is bound to the thunk `2 - 1`, and `xs` to `tail "abcd"`.
+
+We're now evaluating `myDrop` from the beginning again. We substitute the new values of `n` and `xs` into the predicate.
+
+```haskell
+ghci> :type (2 - 1) <= 0 || null (tail "abcd")
+(2 - 1) <= 0 || null (tail "abcd") :: Bool
+```
+
+Here's a condensed version of the evaluation of the left operand.
+
+```haskell
+ghci> :type (2 - 1) <= 0
+(2 - 1) <= 0 :: Bool
+ghci> 2 - 1
+1
+ghci> 1 <= 0
+False
+No comments
+As we should now expect, we didn't evaluate the expression 2 - 1 until we needed its value. We also evaluate the right operand lazily, deferring tail "abcd" until we need its value. 2 comments
+
+ghci> :type null (tail "abcd")
+null (tail "abcd") :: Bool
+ghci> tail "abcd"
+"bcd"
+ghci> null "bcd"
+False
+No comments
+The predicate again evaluates to False, causing the else branch to be evaluated once more. 2 comments
+
+Because we've had to evaluate the expressions for n and xs to evaluate the predicate, we now know that in this application of myDrop, n has the value 1 and xs has the value "bcd". 1 comment
+
+Ending the recursion
+In the next recursive application of myDrop, we bind n to 1 - 1 and xs to tail "bcd". 5 comments
+
+ghci> :type (1 - 1) <= 0 || null (tail "bcd")
+(1 - 1) <= 0 || null (tail "bcd") :: Bool
+No comments
+Once again, (||) needs to evaluate its left operand first. No comments
+
+ghci> :type (1 - 1) <= 0
+(1 - 1) <= 0 :: Bool
+ghci> 1 - 1
+0
+ghci> 0 <= 0
+True
+No comments
+Finally, this expression has evaluated to True! No comments
+
+ghci> True || null (tail "bcd")
+True
+No comments
+Because the right operand cannot affect the result of (||), it is not evaluated, and the result of the predicate is True. This causes us to evaluate the then branch. 4 comments
+
+ghci> :type tail "bcd"
+tail "bcd" :: [Char]
+No comments
+Returning from the recursion
+Remember, we're now inside our second recursive application of myDrop. This application evaluates to tail "bcd". We return from the application of the function, substituting this expression for myDrop (1 - 1) (tail "bcd"), to become the result of this application. 4 comments
+
+ghci> myDrop (1 - 1) (tail "bcd") == tail "bcd"
+True
+No comments
+We then return from the first recursive application, substituting the result of the second recursive application for myDrop (2 - 1) (tail "abcd"), to become the result of this application. 1 comment
+
+ghci> myDrop (2 - 1) (tail "abcd") == tail "bcd"
+True
+No comments
+Finally, we return from our original application, substituting the result of the first recursive application. 2 comments
+
+ghci> myDrop 2 "abcd" == tail "bcd"
+True
+No comments
+Notice that as we return from each successive recursive application, none of them needs to evaluate the expression tail "bcd": the final result of evaluating the original expression is a thunk. The thunk is only finally evaluated when ghci needs to print it. 8 comments
+
+ghci> myDrop 2 "abcd"
+"cd"
+ghci> tail "bcd"
+"cd"
+4 comments
+
 ---
 title: New Section 20
 files: []
@@ -690,3 +777,4 @@ title: New Section 22
 files: []
 
 ---
+
